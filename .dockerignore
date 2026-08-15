@@ -1,0 +1,28 @@
+# Secrets — never bake into the image
+.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+.mypy_cache/
+.pytest_cache/
+
+# Virtual environments
+.venv/
+venv/
+
+# Dev / docs files (not needed at runtime)
+*.md
+tests/
+check_models.py
+test_gemini_direct.py
+test_standalone.py
+
+# Git
+.git/
+.gitignore
+
+# OS
+.DS_Store
+Thumbs.db

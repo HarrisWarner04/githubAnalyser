@@ -1,0 +1,50 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GitHub Analyzer MCP Server — Docker Compose
+#
+# Quick start:
+#   1. cp .env.example .env  →  fill in API keys
+#   2. docker compose up -d --build
+#   3. MCP clients connect to: http://YOUR_VM_IP:8000/mcp
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── MCP Server (Streamable HTTP transport) ────────────────────────────────
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: github-analyzer-mcp:latest
+    container_name: github-analyzer-mcp
+    restart: unless-stopped
+
+    # Secrets injected from .env file — never hard-coded here
+    env_file:
+      - .env
+
+    # Allow individual overrides without editing .env
+    environment:
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.5-flash}
+      - GROQ_MODEL=${GROQ_MODEL:-llama-3.1-8b-instant}
+      - MAX_SOURCE_FILES=${MAX_SOURCE_FILES:-12}
+      - MAX_FILE_SIZE_KB=${MAX_FILE_SIZE_KB:-80}
+
+    ports:
+      - "${MCP_PORT:-8000}:8000"
+
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/mcp')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 25s
+
+    # Resource limits (comfortable for free-tier VMs with 1 GB RAM)
+    deploy:
+      resources:
+        limits:
+          memory: 512M

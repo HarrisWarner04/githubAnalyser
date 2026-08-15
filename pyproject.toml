@@ -1,0 +1,17 @@
+[project]
+name = "github-analyzer-mcp"
+version = "1.0.0"
+description = "MCP server that analyses GitHub repos against best practices using Gemini + Groq"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp[cli]==2.0.0",
+    "google-genai==1.10.0",
+    "groq==0.11.0",
+    "httpx==0.27.2",
+    "pydantic==2.8.2",
+    "python-dotenv==1.0.1",
+    "tenacity==9.0.0",
+]
+
+[project.scripts]
+github-analyzer = "server:main"
