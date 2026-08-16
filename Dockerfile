@@ -46,9 +46,9 @@ EXPOSE 8000
 
 USER appuser
 
-# Healthcheck — calls the /mcp endpoint (MCP streamable HTTP)
+# Healthcheck — calls the /api/health endpoint
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/mcp')" \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')" \
         || exit 1
 
 # Run in HTTP transport mode so Docker clients can connect over the network
