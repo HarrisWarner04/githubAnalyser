@@ -36,8 +36,9 @@ WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy application code only (no .env — secrets come from env vars at runtime)
+# Copy application code and web dashboard assets (no .env — secrets come from env vars at runtime)
 COPY src/ ./src/
+COPY static/ ./static/
 COPY server.py .
 
 # HTTP transport port

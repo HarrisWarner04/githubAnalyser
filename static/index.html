@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GitHub Repo Analyzer — AI-Powered Best Practice Audits</title>
+  <meta name="description" content="Audit GitHub repositories against industry best practices using Gemini & Groq AI. Real-time scores for security, testing, CI/CD, code quality, and more.">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="background-glow glow-1"></div>
+  <div class="background-glow glow-2"></div>
+  <div class="background-glow glow-3"></div>
+
+  <!-- Header / Navbar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="/" class="brand-logo">
+        <div class="logo-icon-wrap">
+          <i class="fa-brands fa-github"></i>
+        </div>
+        <div class="logo-text">
+          <span class="logo-title">Repo<span class="gradient-text">Analyzer</span></span>
+          <span class="logo-badge">MCP & Web</span>
+        </div>
+      </a>
+
+      <div class="nav-actions">
+        <button id="btnOpenMcpModal" class="btn-secondary" title="View MCP configuration">
+          <i class="fa-solid fa-network-wired"></i>
+          <span>MCP Host Config</span>
+        </button>
+        <a href="https://github.com" target="_blank" rel="noopener noreferrer" class="btn-icon" title="GitHub">
+          <i class="fa-brands fa-github"></i>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <!-- Hero Section -->
+    <section class="hero-section">
+      <div class="hero-badge">
+        <span class="pulse-dot"></span>
+        <span>Dual AI Analysis: Gemini 3.5 Flash + Groq LLaMA 3.1</span>
+      </div>
+      <h1 class="hero-title">
+        Audit Any GitHub Repository <br>
+        <span class="gradient-text">Against Industry Best Practices</span>
+      </h1>
+      <p class="hero-subtitle">
+        Deep multi-dimensional analysis across 8 critical software quality pillars — code health, security, testing coverage, CI/CD, documentation, and dependencies.
+      </p>
+
+      <!-- Search Box -->
+      <form id="analyzeForm" class="search-form" autocomplete="off">
+        <div class="search-input-wrapper">
+          <i class="fa-brands fa-github search-icon"></i>
+          <input 
+            type="text" 
+            id="repoUrlInput" 
+            placeholder="Paste GitHub URL (e.g., https://github.com/pallets/click or tiangolo/fastapi)..."
+            required
+            spellcheck="false"
+          >
+          <button type="submit" id="submitBtn" class="btn-primary">
+            <span class="btn-text">Audit Repo</span>
+            <i class="fa-solid fa-arrow-right btn-arrow"></i>
+          </button>
+        </div>
+      </form>
+
+      <!-- Quick sample pills -->
+      <div class="sample-chips">
+        <span class="chips-label">Try popular repos:</span>
+        <button type="button" class="chip" data-repo="https://github.com/pallets/click">
+          <i class="fa-solid fa-terminal"></i> pallets/click
+        </button>
+        <button type="button" class="chip" data-repo="https://github.com/tiangolo/fastapi">
+          <i class="fa-solid fa-bolt"></i> tiangolo/fastapi
+        </button>
+        <button type="button" class="chip" data-repo="https://github.com/encode/httpx">
+          <i class="fa-solid fa-globe"></i> encode/httpx
+        </button>
+        <button type="button" class="chip" data-repo="https://github.com/psf/requests">
+          <i class="fa-solid fa-code-fork"></i> psf/requests
+        </button>
+      </div>
+    </section>
+
+    <!-- Loading State / Stepper -->
+    <section id="loadingSection" class="loading-section hidden">
+      <div class="glass-card loading-card">
+        <div class="loading-header">
+          <div class="spinner-ring"></div>
+          <div class="loading-titles">
+            <h3 id="loadingTitle">Auditing Repository...</h3>
+            <p id="loadingRepoName" class="loading-repo-text">https://github.com/...</p>
+          </div>
+          <div class="time-estimate">
+            <i class="fa-regular fa-clock"></i>
+            <span id="elapsedTimer">0s</span>
+          </div>
+        </div>
+
+        <div class="progress-bar-container">
+          <div id="progressBar" class="progress-bar-fill"></div>
+        </div>
+
+        <div class="stepper-list">
+          <div class="step-item active" id="step-1">
+            <div class="step-indicator"><i class="fa-solid fa-spinner fa-spin"></i></div>
+            <div class="step-content">
+              <span class="step-title">1. Fetching Repository Structure</span>
+              <span class="step-desc">Pulling file tree, README, workflows & key configs</span>
+            </div>
+          </div>
+
+          <div class="step-item" id="step-2">
+            <div class="step-indicator"><i class="fa-regular fa-circle"></i></div>
+            <div class="step-content">
+              <span class="step-title">2. Summarizing Codebase</span>
+              <span class="step-desc">Extracting token-safe structural architecture</span>
+            </div>
+          </div>
+
+          <div class="step-item" id="step-3">
+            <div class="step-indicator"><i class="fa-regular fa-circle"></i></div>
+            <div class="step-content">
+              <span class="step-title">3. Deep Qualitative Audit (Gemini)</span>
+              <span class="step-desc">Evaluating 8 dimensions: security, testing, CI/CD, docs</span>
+            </div>
+          </div>
+
+          <div class="step-item" id="step-4">
+            <div class="step-indicator"><i class="fa-regular fa-circle"></i></div>
+            <div class="step-content">
+              <span class="step-title">4. Structured Scoring & Prioritization (Groq)</span>
+              <span class="step-desc">Ranking recommendations by impact & effort</span>
+            </div>
+          </div>
+
+          <div class="step-item" id="step-5">
+            <div class="step-indicator"><i class="fa-regular fa-circle"></i></div>
+            <div class="step-content">
+              <span class="step-title">5. Compiling Audit Report</span>
+              <span class="step-desc">Merging data and computing overall grade</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Error State -->
+    <section id="errorSection" class="error-section hidden">
+      <div class="glass-card error-card">
+        <div class="error-icon">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div class="error-info">
+          <h3>Analysis Failed</h3>
+          <p id="errorMessage">An unexpected error occurred while analyzing the repository.</p>
+        </div>
+        <button type="button" id="btnRetry" class="btn-secondary">
+          <i class="fa-solid fa-arrow-rotate-left"></i> Try Again
+        </button>
+      </div>
+    </section>
+
+    <!-- Results Section -->
+    <section id="resultsSection" class="results-section hidden">
+      <!-- Repo Header Banner -->
+      <div class="glass-card repo-header-card">
+        <div class="repo-main-info">
+          <div class="repo-title-row">
+            <h2 id="resRepoFullName" class="repo-title">owner/repository</h2>
+            <a id="resRepoLink" href="#" target="_blank" rel="noopener noreferrer" class="repo-external-link">
+              <i class="fa-brands fa-github"></i> View on GitHub <i class="fa-solid fa-arrow-up-right-from-square"></i>
+            </a>
+          </div>
+          <p id="resRepoDesc" class="repo-description">Repository description will appear here...</p>
+        </div>
+
+        <div class="repo-metrics-grid">
+          <div class="metric-pill">
+            <i class="fa-solid fa-star text-amber"></i>
+            <div>
+              <span id="resStars" class="metric-value">0</span>
+              <span class="metric-label">Stars</span>
+            </div>
+          </div>
+          <div class="metric-pill">
+            <i class="fa-solid fa-code-fork text-blue"></i>
+            <div>
+              <span id="resForks" class="metric-value">0</span>
+              <span class="metric-label">Forks</span>
+            </div>
+          </div>
+          <div class="metric-pill">
+            <i class="fa-solid fa-circle-dot text-rose"></i>
+            <div>
+              <span id="resOpenIssues" class="metric-value">0</span>
+              <span class="metric-label">Open Issues</span>
+            </div>
+          </div>
+          <div class="metric-pill">
+            <i class="fa-solid fa-code text-cyan"></i>
+            <div>
+              <span id="resLanguage" class="metric-value">Python</span>
+              <span class="metric-label">Language</span>
+            </div>
+          </div>
+          <div class="metric-pill">
+            <i class="fa-solid fa-scale-balanced text-emerald"></i>
+            <div>
+              <span id="resLicense" class="metric-value">MIT</span>
+              <span class="metric-label">License</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hero Scorecard & Executive Summary -->
+      <div class="scorecard-grid">
+        <!-- Radial Overall Score -->
+        <div class="glass-card overall-score-card">
+          <span class="card-tag">Overall Assessment</span>
+          
+          <div class="gauge-container">
+            <svg class="score-gauge" viewBox="0 0 160 160">
+              <circle class="gauge-bg" cx="80" cy="80" r="70"></circle>
+              <circle id="scoreGaugeFill" class="gauge-fill" cx="80" cy="80" r="70"></circle>
+            </svg>
+            <div class="gauge-center">
+              <span id="resOverallScore" class="score-number">0</span>
+              <span class="score-max">/100</span>
+            </div>
+          </div>
+
+          <div class="grade-banner">
+            <span>Overall Grade:</span>
+            <span id="resOverallGrade" class="grade-pill grade-a">A</span>
+          </div>
+
+          <p class="score-timestamp">
+            <i class="fa-regular fa-clock"></i> Analyzed: <span id="resAnalyzedAt">Just now</span>
+          </p>
+        </div>
+
+        <!-- Executive Summary & Strengths vs Issues -->
+        <div class="glass-card summary-card">
+          <span class="card-tag">Executive Summary</span>
+          <p id="resExecutiveSummary" class="executive-summary-text">
+            Summary text...
+          </p>
+
+          <div class="strengths-issues-row">
+            <div class="mini-list-card strengths-card">
+              <div class="mini-list-header text-emerald">
+                <i class="fa-solid fa-circle-check"></i>
+                <h4>Top Strengths</h4>
+              </div>
+              <ul id="resTopStrengths" class="bullet-list">
+                <!-- Injected via JS -->
+              </ul>
+            </div>
+
+            <div class="mini-list-card issues-card">
+              <div class="mini-list-header text-amber">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <h4>Areas for Improvement</h4>
+              </div>
+              <ul id="resTopIssues" class="bullet-list">
+                <!-- Injected via JS -->
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 8-Category Scorecards -->
+      <div class="section-title-wrap">
+        <h3 class="section-title">
+          <i class="fa-solid fa-layer-group text-cyan"></i> 8-Pillar Quality Breakdown
+        </h3>
+        <p class="section-subtitle">Comprehensive assessment across key software engineering disciplines</p>
+      </div>
+
+      <div id="categoriesGrid" class="categories-grid">
+        <!-- Injected via JS -->
+      </div>
+
+      <!-- Prioritized Recommendations -->
+      <div class="section-title-wrap">
+        <div class="title-with-actions">
+          <div>
+            <h3 class="section-title">
+              <i class="fa-solid fa-list-check text-indigo"></i> Action Plan & Recommendations
+            </h3>
+            <p class="section-subtitle">Ranked by urgency and implementation effort</p>
+          </div>
+
+          <!-- Priority Filters -->
+          <div class="filter-pills" id="priorityFilterPills">
+            <button type="button" class="filter-btn active" data-filter="all">All</button>
+            <button type="button" class="filter-btn text-rose" data-filter="critical">Critical</button>
+            <button type="button" class="filter-btn text-amber" data-filter="high">High</button>
+            <button type="button" class="filter-btn text-blue" data-filter="medium">Medium</button>
+            <button type="button" class="filter-btn text-emerald" data-filter="low">Low</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="recommendationsList" class="recommendations-container">
+        <!-- Injected via JS -->
+      </div>
+
+      <!-- Export & Sharing Hub -->
+      <div class="glass-card export-card">
+        <div class="export-text">
+          <h4>Export & Integration Hub</h4>
+          <p>Download the audit report or connect your MCP client to this endpoint.</p>
+        </div>
+        <div class="export-buttons">
+          <button type="button" id="btnCopyMarkdown" class="btn-secondary">
+            <i class="fa-solid fa-copy"></i> Copy Markdown
+          </button>
+          <button type="button" id="btnDownloadJson" class="btn-secondary">
+            <i class="fa-solid fa-download"></i> Download JSON
+          </button>
+          <button type="button" id="btnViewMcpConfig" class="btn-primary">
+            <i class="fa-solid fa-network-wired"></i> MCP Config
+          </button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- MCP Config Modal -->
+  <div id="mcpModal" class="modal-backdrop hidden">
+    <div class="glass-card modal-container">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <div class="modal-icon"><i class="fa-solid fa-network-wired"></i></div>
+          <div>
+            <h3>Connect to AI Assistants (MCP)</h3>
+            <p>Use this server directly inside Claude Desktop, Cursor, or Kiro IDE</p>
+          </div>
+        </div>
+        <button type="button" id="btnCloseMcpModal" class="btn-close-modal" aria-label="Close modal">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="modal-tabs">
+        <button type="button" class="modal-tab active" data-tab="tab-remote">Remote URL (HTTP / Cloud)</button>
+        <button type="button" class="modal-tab" data-tab="tab-claude">Claude Desktop (Local)</button>
+        <button type="button" class="modal-tab" data-tab="tab-cursor">Cursor / Kiro</button>
+      </div>
+
+      <div class="modal-body">
+        <div id="tab-remote" class="tab-pane active">
+          <p class="tab-instruction">Connect your remote MCP client to your Azure VM streamable HTTP endpoint:</p>
+          <div class="code-block-wrapper">
+            <pre><code id="codeRemoteMcp">{
+  "mcpServers": {
+    "github-analyzer": {
+      "url": "http://YOUR_SERVER_HOST:8000/mcp",
+      "transport": "http"
+    }
+  }
+}</code></pre>
+            <button type="button" class="btn-copy-code" data-target="codeRemoteMcp">
+              <i class="fa-regular fa-copy"></i> Copy
+            </button>
+          </div>
+        </div>
+
+        <div id="tab-claude" class="tab-pane">
+          <p class="tab-instruction">Add to <code>claude_desktop_config.json</code>:</p>
+          <div class="code-block-wrapper">
+            <pre><code id="codeClaudeMcp">{
+  "mcpServers": {
+    "github-analyzer": {
+      "command": "python",
+      "args": ["/path/to/github-analyzer-mcp/server.py"],
+      "env": {
+        "GEMINI_API_KEY": "your_gemini_key",
+        "GROQ_API_KEY": "your_groq_key",
+        "GEMINI_MODEL": "gemini-3.5-flash",
+        "GROQ_MODEL": "llama-3.1-8b-instant"
+      }
+    }
+  }
+}</code></pre>
+            <button type="button" class="btn-copy-code" data-target="codeClaudeMcp">
+              <i class="fa-regular fa-copy"></i> Copy
+            </button>
+          </div>
+        </div>
+
+        <div id="tab-cursor" class="tab-pane">
+          <p class="tab-instruction">Add to <code>.kiro/settings/mcp.json</code> or Cursor settings:</p>
+          <div class="code-block-wrapper">
+            <pre><code id="codeCursorMcp">{
+  "mcpServers": {
+    "github-analyzer": {
+      "command": "python",
+      "args": ["d:\\MCP Project\\github-analyzer-mcp\\server.py"]
+    }
+  }
+}</code></pre>
+            <button type="button" class="btn-copy-code" data-target="codeCursorMcp">
+              <i class="fa-regular fa-copy"></i> Copy
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toastNotification" class="toast-notification hidden">
+    <i class="fa-solid fa-check"></i>
+    <span id="toastText">Copied to clipboard!</span>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-container">
+      <div class="footer-left">
+        <p><strong>GitHub Analyzer MCP</strong> — Powered by <strong>Gemini 3.5 Flash</strong> & <strong>Groq LLaMA 3.1 8B</strong></p>
+      </div>
+      <div class="footer-right">
+        <span class="status-indicator"><span class="status-dot"></span> MCP v2 Active</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

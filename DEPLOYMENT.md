@@ -167,9 +167,20 @@ On cloud providers also open port 8000 in the security group / firewall rules:
 ### 7. Test the deployment
 
 ```bash
-# From your local machine
+# From your browser or curl:
+# 1. Interactive Web Dashboard
+http://YOUR_VM_IP:8000/
+
+# 2. Health check
+curl http://YOUR_VM_IP:8000/api/health
+
+# 3. REST API Analysis
+curl -X POST http://YOUR_VM_IP:8000/api/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"repo_url": "https://github.com/pallets/click"}'
+
+# 4. MCP Protocol streamable HTTP endpoint
 curl http://YOUR_VM_IP:8000/mcp
-# → Should return MCP initialization response (JSON)
 ```
 
 ---
@@ -215,39 +226,60 @@ docker stats
 
 ---
 
-## HTTPS (Optional but Recommended for Production)
+## Custom Subdomain & HTTPS (Nginx + Let's Encrypt)
+
+Point your subdomain (e.g. `analyzer.yourdomain.com`) to your Azure VM Public IP (DNS **A-record**), then configure Nginx to proxy both the Web UI and MCP protocol with automated SSL:
 
 ```bash
-# Install nginx + certbot on VM
+# 1. Install Nginx & Certbot on the VM
 sudo apt install nginx certbot python3-certbot-nginx -y
 
-# Get free Let's Encrypt certificate
-sudo certbot --nginx -d your-domain.com
+# 2. Create Nginx site config: /etc/nginx/sites-available/analyzer
+sudo nano /etc/nginx/sites-available/analyzer
+```
 
-# Nginx reverse proxy config: /etc/nginx/sites-available/mcp
+Paste the following Nginx server block:
+
+```nginx
 server {
-    listen 443 ssl http2;
-    server_name your-domain.com;
+    listen 80;
+    server_name analyzer.yourdomain.com;
 
-    ssl_certificate /etc/letsencrypt/live/your-domain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
+    # Allow large analysis timeouts (up to 120s)
+    proxy_read_timeout 120s;
+    proxy_connect_timeout 120s;
+    proxy_send_timeout 120s;
 
-    # MCP endpoint
-    location /mcp {
-        proxy_pass http://127.0.0.1:8000/mcp;
+    # Pass all traffic to Docker container on port 8000
+    location / {
+        proxy_pass http://127.0.0.1:8000;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_read_timeout 120s;   # analysis takes 30-60s
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # SSE / Streaming support
+        proxy_set_header Connection '';
+        proxy_buffering off;
+        proxy_cache off;
     }
 }
-
-# Enable and reload
-sudo ln -s /etc/nginx/sites-available/mcp /etc/nginx/sites-enabled/
-sudo nginx -t && sudo systemctl reload nginx
 ```
 
-Clients now connect to `https://your-domain.com/mcp`.
+```bash
+# 3. Enable site and test config
+sudo ln -s /etc/nginx/sites-available/analyzer /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+
+# 4. Generate free Let's Encrypt SSL certificate
+sudo certbot --nginx -d analyzer.yourdomain.com
+```
+
+Now you have:
+- 🌐 **Web Dashboard**: `https://analyzer.yourdomain.com/`
+- 🤖 **MCP Protocol**: `https://analyzer.yourdomain.com/mcp`
+- ⚡ **REST API**: `https://analyzer.yourdomain.com/api/analyze`
 
 ---
 
