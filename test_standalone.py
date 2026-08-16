@@ -7,6 +7,13 @@ Run:
 """
 import asyncio
 import json
+import sys
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 from src.github.fetcher import fetch_repo
 from src.analyzers.summarizer import build_summary
 from src.analyzers.gemini import GeminiAnalyzer

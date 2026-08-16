@@ -19,14 +19,16 @@ class GroqAnalyzer:
         self.client = Groq(api_key=config.GROQ_API_KEY)
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=4, max=30), reraise=True)
-    async def score(self, summary: str, gemini_out: str) -> list[dict]:
+    async def score(self, summary: str, gemini_out: str | dict) -> list[dict]:
         """Run Groq scoring in a thread (SDK is sync) and return parsed JSON list."""
+        gemini_str = json.dumps(gemini_out) if isinstance(gemini_out, dict) else gemini_out
+
         def _call():
             return self.client.chat.completions.create(
                 model=config.GROQ_MODEL,
                 messages=[
                     {"role": "system", "content": GROQ_SYS},
-                    {"role": "user",   "content": groq_prompt(summary, gemini_out)},
+                    {"role": "user",   "content": groq_prompt(summary, gemini_str)},
                 ],
                 temperature=0.1,
                 max_tokens=2048,
