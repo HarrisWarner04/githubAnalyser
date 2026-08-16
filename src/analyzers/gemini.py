@@ -24,16 +24,54 @@ def _is_retryable(exc: BaseException) -> bool:
 
 class GeminiAnalyzer:
     def __init__(self):
-        self.client = genai.Client(api_key=config.GEMINI_API_KEY)
+        self.gemini_key = config.GEMINI_API_KEY
+        self.groq_key = config.GROQ_API_KEY
+        self.client = genai.Client(api_key=self.gemini_key) if self.gemini_key else None
+
+    async def _fallback_groq(self, summary: str) -> dict:
+        """Fallback to Groq if Gemini is geographically restricted."""
+        from groq import Groq
+        logger.info("Running qualitative analysis via Groq fallback...")
+        groq_client = Groq(api_key=self.groq_key)
+        
+        def _call_groq():
+            return groq_client.chat.completions.create(
+                model="llama-3.3-70b-versatile" if "70b" in config.GROQ_MODEL else config.GROQ_MODEL,
+                messages=[
+                    {"role": "system", "content": GEMINI_SYS},
+                    {"role": "user", "content": gemini_prompt(summary)},
+                ],
+                temperature=0.2,
+                max_tokens=4096,
+                response_format={"type": "json_object"}
+            )
+        
+        comp = await asyncio.to_thread(_call_groq)
+        raw = comp.choices[0].message.content or ""
+        return self._parse(raw)
+
+    async def analyse(self, summary: str) -> dict:
+        """Run analysis with Gemini, automatically falling back to Groq if location restricted."""
+        if not self.client:
+            return await self._fallback_groq(summary)
+
+        try:
+            return await self._call_gemini_with_retry(summary)
+        except Exception as exc:
+            err_msg = str(exc)
+            if "location is not supported" in err_msg or "FAILED_PRECONDITION" in err_msg or "400" in err_msg:
+                logger.warning("Gemini location restricted on this VM (%s). Switching to Groq fallback...", err_msg)
+                return await self._fallback_groq(summary)
+            raise
 
     @retry(
-        stop=stop_after_attempt(5),
-        wait=wait_exponential(min=10, max=60),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(min=5, max=30),
         retry=retry_if_exception(_is_retryable),
         reraise=True,
     )
-    async def analyse(self, summary: str) -> dict:
-        """Run Gemini analysis in a thread (SDK is sync) and return parsed JSON."""
+    async def _call_gemini_with_retry(self, summary: str) -> dict:
+        """Run Gemini analysis in a thread."""
         def _call():
             return self.client.models.generate_content(
                 model=config.GEMINI_MODEL,
@@ -62,5 +100,5 @@ class GeminiAnalyzer:
             ).strip()
         s, e = txt.find("{"), txt.rfind("}")
         if s == -1 or e == -1:
-            raise ValueError(f"No JSON object in Gemini response: {txt[:300]!r}")
+            raise ValueError(f"No JSON object in AI response: {txt[:300]!r}")
         return json.loads(txt[s:e + 1])
