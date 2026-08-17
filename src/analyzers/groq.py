@@ -24,9 +24,12 @@ class GroqAnalyzer:
         """Generate structured recommendations via OpenRouter."""
         candidate_models = [
             config.OPENROUTER_MODEL,
-            "google/gemini-2.0-flash-lite-preview-02-05:free",
+            "openrouter/auto",
+            "google/gemma-4-31b-it:free",
+            "google/gemma-4-26b-a4b-it:free",
+            "nvidia/nemotron-3.5-lightning:free",
+            "openai/gpt-oss-20b:free",
             "meta-llama/llama-3.3-70b-instruct:free",
-            "mistralai/mistral-small-24b-instruct-2501:free",
         ]
         candidate_models = list(dict.fromkeys(candidate_models))
 
