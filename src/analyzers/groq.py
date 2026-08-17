@@ -22,27 +22,41 @@ class GroqAnalyzer:
 
     async def _score_openrouter(self, summary: str, gemini_str: str) -> list[dict]:
         """Generate structured recommendations via OpenRouter."""
-        logger.info("Running prioritized scoring via OpenRouter...")
+        candidate_models = [
+            config.OPENROUTER_MODEL,
+            "google/gemini-2.0-flash-lite-preview-02-05:free",
+            "meta-llama/llama-3.3-70b-instruct:free",
+            "mistralai/mistral-small-24b-instruct-2501:free",
+        ]
+        candidate_models = list(dict.fromkeys(candidate_models))
+
         headers = {
             "Authorization": f"Bearer {self.openrouter_key}",
             "HTTP-Referer": "https://githubanalyser.bugbiceps.in",
             "X-Title": "GitHub Repo Analyzer",
             "Content-Type": "application/json"
         }
-        payload = {
-            "model": config.OPENROUTER_MODEL,
-            "messages": [
-                {"role": "system", "content": GROQ_SYS},
-                {"role": "user", "content": groq_prompt(summary, gemini_str)},
-            ],
-            "temperature": 0.1,
-        }
-        async with httpx.AsyncClient(timeout=45.0) as client:
-            r = await client.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload)
-            r.raise_for_status()
-            data = r.json()
-            raw = data["choices"][0]["message"]["content"] or ""
-            return self._parse(raw)
+
+        for model in candidate_models:
+            payload = {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": GROQ_SYS},
+                    {"role": "user", "content": groq_prompt(summary, gemini_str)},
+                ],
+                "temperature": 0.1,
+            }
+            try:
+                async with httpx.AsyncClient(timeout=45.0) as client:
+                    r = await client.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload)
+                    if r.status_code == 200:
+                        data = r.json()
+                        raw = data["choices"][0]["message"]["content"] or ""
+                        return self._parse(raw)
+            except Exception as exc:
+                logger.warning("OpenRouter scoring with %s failed: %s", model, exc)
+
+        return []
 
     async def score(self, summary: str, gemini_out: str | dict) -> list[dict]:
         """Run scoring: Prioritize OpenRouter if configured, then Groq."""

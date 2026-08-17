@@ -30,27 +30,50 @@ class GeminiAnalyzer:
 
     async def _call_openrouter(self, summary: str) -> dict:
         """Run qualitative analysis via OpenRouter (globally accessible without cloud region blocks)."""
-        logger.info("Running qualitative audit via OpenRouter (%s)...", config.OPENROUTER_MODEL)
+        candidate_models = [
+            config.OPENROUTER_MODEL,
+            "google/gemini-2.0-flash-lite-preview-02-05:free",
+            "meta-llama/llama-3.3-70b-instruct:free",
+            "mistralai/mistral-small-24b-instruct-2501:free",
+            "deepseek/deepseek-r1:free"
+        ]
+        # Deduplicate while preserving order
+        candidate_models = list(dict.fromkeys(candidate_models))
+
         headers = {
             "Authorization": f"Bearer {self.openrouter_key}",
             "HTTP-Referer": "https://githubanalyser.bugbiceps.in",
             "X-Title": "GitHub Repo Analyzer",
             "Content-Type": "application/json"
         }
-        payload = {
-            "model": config.OPENROUTER_MODEL,
-            "messages": [
-                {"role": "system", "content": GEMINI_SYS},
-                {"role": "user", "content": gemini_prompt(summary)},
-            ],
-            "temperature": 0.2,
-        }
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            r = await client.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload)
-            r.raise_for_status()
-            data = r.json()
-            raw = data["choices"][0]["message"]["content"] or ""
-            return self._parse(raw)
+
+        last_error = None
+        for model in candidate_models:
+            logger.info("Attempting OpenRouter model: %s...", model)
+            payload = {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": GEMINI_SYS},
+                    {"role": "user", "content": gemini_prompt(summary)},
+                ],
+                "temperature": 0.2,
+            }
+            try:
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    r = await client.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload)
+                    if r.status_code == 200:
+                        data = r.json()
+                        raw = data["choices"][0]["message"]["content"] or ""
+                        return self._parse(raw)
+                    else:
+                        err_text = r.text
+                        logger.warning("OpenRouter model %s returned status %d: %s", model, r.status_code, err_text[:200])
+                        last_error = f"HTTP {r.status_code}: {err_text[:200]}"
+            except Exception as e:
+                logger.warning("OpenRouter model %s exception: %s", model, e)
+                last_error = str(e)
+
+        raise RuntimeError(f"All OpenRouter models failed. Last error: {last_error}")
 
     async def _fallback_groq(self, summary: str) -> dict:
         """Fallback to Groq if Gemini is geographically restricted."""
