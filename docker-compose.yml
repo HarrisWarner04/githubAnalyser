@@ -27,6 +27,8 @@ services:
     environment:
       - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.5-flash}
       - GROQ_MODEL=${GROQ_MODEL:-llama-3.1-8b-instant}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-meta-llama/llama-3.3-70b-instruct:free}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - MAX_SOURCE_FILES=${MAX_SOURCE_FILES:-12}
       - MAX_FILE_SIZE_KB=${MAX_FILE_SIZE_KB:-80}
 

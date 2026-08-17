@@ -1,12 +1,11 @@
 """
-Gemini analyzer — deep qualitative code analysis.
-Uses google-genai SDK with asyncio.to_thread to avoid blocking the event loop,
-since the google-genai client is synchronous.
+AI Qualitative Analyzer — supports OpenRouter, Gemini, and Groq with automatic fallback.
 """
 from __future__ import annotations
 import asyncio
 import json
 import logging
+import httpx
 from google import genai
 from google.genai import types
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
@@ -26,7 +25,32 @@ class GeminiAnalyzer:
     def __init__(self):
         self.gemini_key = config.GEMINI_API_KEY
         self.groq_key = config.GROQ_API_KEY
+        self.openrouter_key = config.OPENROUTER_API_KEY
         self.client = genai.Client(api_key=self.gemini_key) if self.gemini_key else None
+
+    async def _call_openrouter(self, summary: str) -> dict:
+        """Run qualitative analysis via OpenRouter (globally accessible without cloud region blocks)."""
+        logger.info("Running qualitative audit via OpenRouter (%s)...", config.OPENROUTER_MODEL)
+        headers = {
+            "Authorization": f"Bearer {self.openrouter_key}",
+            "HTTP-Referer": "https://githubanalyser.bugbiceps.in",
+            "X-Title": "GitHub Repo Analyzer",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": config.OPENROUTER_MODEL,
+            "messages": [
+                {"role": "system", "content": GEMINI_SYS},
+                {"role": "user", "content": gemini_prompt(summary)},
+            ],
+            "temperature": 0.2,
+        }
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            r = await client.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload)
+            r.raise_for_status()
+            data = r.json()
+            raw = data["choices"][0]["message"]["content"] or ""
+            return self._parse(raw)
 
     async def _fallback_groq(self, summary: str) -> dict:
         """Fallback to Groq if Gemini is geographically restricted."""
@@ -51,18 +75,30 @@ class GeminiAnalyzer:
         return self._parse(raw)
 
     async def analyse(self, summary: str) -> dict:
-        """Run analysis with Gemini, automatically falling back to Groq if location restricted."""
-        if not self.client:
-            return await self._fallback_groq(summary)
+        """Run analysis: Prioritize OpenRouter if set (fixes region blocks), then Gemini, then Groq."""
+        # 1. OpenRouter (Zero region restrictions)
+        if self.openrouter_key:
+            try:
+                return await self._call_openrouter(summary)
+            except Exception as exc:
+                logger.warning("OpenRouter analysis failed (%s), trying alternate providers...", exc)
 
-        try:
-            return await self._call_gemini_with_retry(summary)
-        except Exception as exc:
-            err_msg = str(exc)
-            if "location is not supported" in err_msg or "FAILED_PRECONDITION" in err_msg or "400" in err_msg:
-                logger.warning("Gemini location restricted on this VM (%s). Switching to Groq fallback...", err_msg)
+        # 2. Gemini (Direct)
+        if self.client and self.gemini_key:
+            try:
+                return await self._call_gemini_with_retry(summary)
+            except Exception as exc:
+                err_msg = str(exc)
+                logger.warning("Gemini failed (%s), trying fallback...", err_msg)
+
+        # 3. Groq
+        if self.groq_key:
+            try:
                 return await self._fallback_groq(summary)
-            raise
+            except Exception as exc:
+                logger.warning("Groq failed (%s)...", exc)
+
+        raise RuntimeError("No AI provider succeeded. Please check your OPENROUTER_API_KEY or GEMINI_API_KEY.")
 
     @retry(
         stop=stop_after_attempt(3),

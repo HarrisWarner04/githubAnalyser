@@ -75,22 +75,32 @@ _groq   = GroqAnalyzer()
 async def _execute_analysis(repo_url: str) -> AnalysisResult:
     """Core analysis logic shared between MCP tool and REST API."""
     logger.info("Step 1/4 — Fetching repo data for %s...", repo_url)
-    repo = await fetch_repo(repo_url)
-    logger.info("Fetched %s: %d source files, %d total files",
-                repo.full_name, len(repo.source_files), len(repo.file_tree))
+    try:
+        repo = await fetch_repo(repo_url)
+        logger.info("Fetched %s: %d source files, %d total files",
+                    repo.full_name, len(repo.source_files), len(repo.file_tree))
+    except Exception as exc:
+        raise RuntimeError(f"GitHub fetch failed for {repo_url}: {exc}") from exc
 
     logger.info("Step 2/4 — Building token-safe summary...")
     summary = build_summary(repo)
     logger.info("Summary: %d chars", len(summary))
 
-    logger.info("Step 3/4 — Running Gemini qualitative audit...")
-    gemini_dict = await _gemini.analyse(summary)
-    gemini_raw  = json.dumps(gemini_dict, indent=2)
-    logger.info("Gemini analysis complete")
+    logger.info("Step 3/4 — Running qualitative audit...")
+    try:
+        gemini_dict = await _gemini.analyse(summary)
+        gemini_raw  = json.dumps(gemini_dict, indent=2)
+        logger.info("Qualitative analysis complete")
+    except Exception as exc:
+        raise RuntimeError(f"AI Qualitative Analysis failed: {exc}") from exc
 
-    logger.info("Step 4/4 — Running Groq structured scoring...")
-    groq_recs = await _groq.score(summary, gemini_raw)
-    logger.info("Groq scoring complete: %d recommendations", len(groq_recs))
+    logger.info("Step 4/4 — Running prioritized scoring...")
+    try:
+        groq_recs = await _groq.score(summary, gemini_raw)
+        logger.info("Prioritized scoring complete: %d recommendations", len(groq_recs))
+    except Exception as exc:
+        logger.warning("Scoring step failed (%s), falling back to baseline recommendations...", exc)
+        groq_recs = []
 
     result = generate(repo, gemini_dict, groq_recs)
     logger.info("Analysis complete for %s: score=%d grade=%s",
